@@ -20,6 +20,7 @@ incomplete implementation.
 check.milter {
 	endpoint <endpoint>
 	fail_open false
+	tls_client { ... }
 }
 
 milter <endpoint>
@@ -39,6 +40,8 @@ Specifies milter protocol endpoint to use.
 The endpoit is specified in standard URL-like format:
 `tcp://127.0.0.1:6669` or `unix:///var/lib/milter/filter.sock`
 
+Use `tls://milter.example.org:6669` to connect to the milter over TLS.
+
 ---
 
 ### fail_open _boolean_
@@ -47,3 +50,9 @@ Default: `false`
 Toggles behavior on milter I/O errors. If false ("fail closed") - message is
 rejected with temporary error code. If true ("fail open") - check is skipped.
 
+---
+
+### tls_client { ... }
+Default: not set
+
+Configure TLS client used for `tls://` endpoints. See [TLS configuration / Client](/reference/tls/#client) for details.

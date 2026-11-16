@@ -30,6 +30,7 @@ import (
 	"github.com/emersion/go-milter"
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
+	tls2 "github.com/foxcpp/maddy/framework/config/tls"
 	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/exterrors"
 	"github.com/foxcpp/maddy/framework/log"
@@ -74,8 +75,13 @@ func (c *Check) Configure(inlineArgs []string, cfg *config.Map) error {
 		return fmt.Errorf("%s: unexpected amount of arguments, want 1 or 0", modName)
 	}
 
+	var tlsConfig *tls.Config
+
 	cfg.String("endpoint", false, false, c.milterUrl, &c.milterUrl)
 	cfg.Bool("fail_open", false, false, &c.failOpen)
+	cfg.Custom("tls_client", true, false, func() (interface{}, error) {
+		return &tls.Config{}, nil
+	}, tls2.TLSClientBlock, &tlsConfig)
 	if _, err := cfg.Process(); err != nil {
 		return err
 	}
@@ -90,15 +96,24 @@ func (c *Check) Configure(inlineArgs []string, cfg *config.Map) error {
 	}
 
 	switch endp.Scheme {
-	case "tcp", "unix":
+	case "tcp", "unix", "tls":
 	default:
 		return fmt.Errorf("%s: scheme unsupported: %v", modName, endp.Scheme)
 	}
 
+	netDialer := &net.Dialer{
+		Timeout: 10 * time.Second,
+	}
+	var dialer milter.Dialer = netDialer
+	if endp.IsTLS() {
+		dialer = &tls.Dialer{
+			NetDialer: netDialer,
+			Config:    tlsConfig,
+		}
+	}
+
 	c.cl = milter.NewClientWithOptions(endp.Network(), endp.Address(), milter.ClientOptions{
-		Dialer: &net.Dialer{
-			Timeout: 10 * time.Second,
-		},
+		Dialer:       dialer,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		ActionMask:   milter.OptAddHeader | milter.OptQuarantine,
